@@ -4,6 +4,7 @@ const qs = require('querystring');
 const { 
     genSignature, 
     nowMinus,
+    isBalanceEnough,
     ObjectFromEntries,
     parseBalanceToFloat
 } = require('./utils/utils');
@@ -83,6 +84,38 @@ const getBalance = () => (
         })
 );
 
+const handleBuyOrder = (ticker, accountBalance) => {
+    const qty = parseFloat(process.env.BUY_QTY);
+    const limitPrice = ticker.sell;
+    const BUY_WHEN_PRICE_LOWER_THAN = parseFloat(process.env.BUY_WHEN_PRICE_LOWER_THAN);
+    if (!(ticker.sell < BUY_WHEN_PRICE_LOWER_THAN))
+        return console.warn(`Valorização atual de ${ticker.last}, ainda muito alto para realizar compra.`);
+    
+    if (!isBalanceEnough(accountBalance.brl, BUY_WHEN_PRICE_LOWER_THAN))
+        return console.warn('Saldo insuficiente para realizar compra.');
+
+    placeBuyOrder(qty, limitPrice)
+        .then(buyOrder => console.info('Ordem de compra inserida ao livro ', buyOrder))
+        .catch(e => console.error('Nao foi possivel realizar a compra devido algum erro.'));
+};
+
+const handleSellOrder = (ticker, accountBalance) => {
+    const qty = parseFloat(process.env.SELL_QTY);
+    const limitPrice = ticker.sell;
+    const PROFITABILITY = parseFloat(process.env.PROFITABILITY);
+    const SELL_WHEN_PRICE_HIGHER_THAN = parseFloat(process.env.SELL_WHEN_PRICE_HIGHER_THAN);
+
+    if (!(SELL_WHEN_PRICE_HIGHER_THAN > ticker.sell))
+        return console.warn(`Valorizacao de ${ticker.sell} não atende  o valor de ${SELL_WHEN_PRICE_HIGHER_THAN} para realizar venda.`)
+
+    if (!isBalanceEnough(accountBalance.btc, qty))
+        return console.warn('Saldo insuficiente para realizar venda.');
+
+    placeBuyOrder(qty, limitPrice * PROFITABILITY)
+        .then(sellOrder => console.info('Ordem de venda inserida ao livro ', sellOrder))
+        .catch(e => console.error('Nao foi possivel realizar a venda devido algum erro.'))
+};
+
 module.exports = {
     getTicker,
     getOrderBook,
@@ -90,7 +123,7 @@ module.exports = {
     getAccountInfo,
     getBalance,
     listMyOrders,
-    placeBuyOrder,
-    placeSellOrder,
+    handleBuyOrder,
+    handleSellOrder,
     cancelOrder
 };
