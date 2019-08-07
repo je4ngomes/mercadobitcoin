@@ -86,13 +86,14 @@ const getBalance = () => (
 );
 
 const handleBuyOrder = (ticker, accountBalance) => {
-    const price = percentToCurrency(process.env.BUY_PER, ticker.last);
+    const 
+        price = percentToCurrency(process.env.BUY_PER, ticker.last),
+        limitPrice = price;
     const qty = currencyToCoin(price, ticker.last);
-    const limitPrice = price;
-    const percenChanged = currencyPriceChange(___, ticker.last)
+    const percenChanges = currencyPriceChange(___, ticker.last)
     const BUY_WHEN_PERCEN_LOWER_THAN = parseFloat(process.env.BUY_WHEN_PERCEN_LOWER_THAN);
     
-    if (!(BUY_WHEN_PERCEN_LOWER_THAN < percenChanged))
+    if (!(BUY_WHEN_PERCEN_LOWER_THAN < percenChanges))
         return console.warn(`Valorização atual de ${ticker.last}, ainda muito alto para realizar compra.`);
     
     if (!isBalanceEnough(accountBalance.brl, BUY_WHEN_BALANCE_HIGHER_THAN))
@@ -104,6 +105,9 @@ const handleBuyOrder = (ticker, accountBalance) => {
 };
 
 const handleSellOrder = (ticker, accountBalance) => {
+    const 
+        price = percentToCurrency(process.env.SEll_PER, ticker.last),
+        limitPrice = price;
     const qty = process.env.SELL_QTY;
     const limitPrice = ticker.sell;
     const PROFITABILITY = parseFloat(process.env.PROFITABILITY);
