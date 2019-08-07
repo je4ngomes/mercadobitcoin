@@ -1,5 +1,6 @@
 const axios = require('axios').default;
 const qs = require('querystring');
+const R = require('ramda');
 
 const { 
     genSignature, 
@@ -75,23 +76,25 @@ const cancelOrder = order_id => (
 const getBalance = () => (
     getAccountInfo()
         .then(retrieveData)
-        .then(({ balance }) => {
-            const entries = Object
-                .entries(balance)
-                .map(([key, { available }]) => [key, parseBalanceToFloat(available)]);
-
-            return ObjectFromEntries(entries);
-        })
+        .then(({ balance }) =>
+            R.compose(
+                R.fromPairs,
+                R.map(([key, { available }]) => [key, parseBalanceToFloat(available)]),
+                R.toPairs
+            )(balance)
+        )
 );
 
 const handleBuyOrder = (ticker, accountBalance) => {
-    const qty = parseFloat(process.env.BUY_QTY);
-    const limitPrice = ticker.sell;
-    const BUY_WHEN_PRICE_LOWER_THAN = parseFloat(process.env.BUY_WHEN_PRICE_LOWER_THAN);
-    if (!(ticker.sell < BUY_WHEN_PRICE_LOWER_THAN))
+    const price = percentToCurrency(process.env.BUY_PER, ticker.last);
+    const qty = currencyToCoin(price, ticker.last);
+    const limitPrice = price;
+    const BUY_WHEN_PERCEN_LOWER_THAN = parseFloat(process.env.BUY_WHEN_PERCEN_LOWER_THAN);
+    
+    if (!(ticker.last < BUY_WHEN_PERCEN_LOWER_THAN))
         return console.warn(`Valorização atual de ${ticker.last}, ainda muito alto para realizar compra.`);
     
-    if (!isBalanceEnough(accountBalance.brl, BUY_WHEN_PRICE_LOWER_THAN))
+    if (!isBalanceEnough(accountBalance.brl, BUY_WHEN_BALANCE_HIGHER_THAN))
         return console.warn('Saldo insuficiente para realizar compra.');
 
     placeBuyOrder(qty, limitPrice)
@@ -100,7 +103,7 @@ const handleBuyOrder = (ticker, accountBalance) => {
 };
 
 const handleSellOrder = (ticker, accountBalance) => {
-    const qty = parseFloat(process.env.SELL_QTY);
+    const qty = process.env.SELL_QTY;
     const limitPrice = ticker.sell;
     const PROFITABILITY = parseFloat(process.env.PROFITABILITY);
     const SELL_WHEN_PRICE_HIGHER_THAN = parseFloat(process.env.SELL_WHEN_PRICE_HIGHER_THAN);

@@ -19,10 +19,20 @@ const isBalanceEnough = (currentBalance, amount) => (
 
 const nowMinus = (minus) => Math.round(new Date().getTime() / minus);
 
+const percentToCurrency = (per, currencyPrice) => (per * currencyPrice) / 100;
+const currencyToCoin = (currency, currencyPrice) => currency / currencyPrice;
+const currencyPriceChange = (price24h, currencyPrice) => (
+    ((price24h - currencyPrice) / price24h) * 100
+);
+
 module.exports = {
     genSignature,
     isBalanceEnough,
     ObjectFromEntries,
+    compose,
     parseBalanceToFloat,
-    nowMinus
+    nowMinus,
+    percentToCurrency,
+    currencyToCoin,
+    currencyPriceChange
 };
