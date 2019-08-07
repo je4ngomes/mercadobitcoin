@@ -85,13 +85,13 @@ const getBalance = () => (
 );
 
 const handleBuyOrder = (ticker, accountBalance) => {
-    const qty = parseFloat(process.env.BUY_QTY);
+    const qty = process.env.BUY_QTY;
     const limitPrice = ticker.sell;
     const BUY_WHEN_PRICE_LOWER_THAN = parseFloat(process.env.BUY_WHEN_PRICE_LOWER_THAN);
     if (!(ticker.sell < BUY_WHEN_PRICE_LOWER_THAN))
         return console.warn(`Valorização atual de ${ticker.last}, ainda muito alto para realizar compra.`);
     
-    if (!isBalanceEnough(accountBalance.brl, BUY_WHEN_PRICE_LOWER_THAN))
+    if (!isBalanceEnough(accountBalance.brl, BUY_WHEN_BALANCE_HIGHER_THAN))
         return console.warn('Saldo insuficiente para realizar compra.');
 
     placeBuyOrder(qty, limitPrice)
@@ -100,7 +100,7 @@ const handleBuyOrder = (ticker, accountBalance) => {
 };
 
 const handleSellOrder = (ticker, accountBalance) => {
-    const qty = parseFloat(process.env.SELL_QTY);
+    const qty = process.env.SELL_QTY;
     const limitPrice = ticker.sell;
     const PROFITABILITY = parseFloat(process.env.PROFITABILITY);
     const SELL_WHEN_PRICE_HIGHER_THAN = parseFloat(process.env.SELL_WHEN_PRICE_HIGHER_THAN);
