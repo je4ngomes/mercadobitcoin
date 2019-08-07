@@ -89,9 +89,10 @@ const handleBuyOrder = (ticker, accountBalance) => {
     const price = percentToCurrency(process.env.BUY_PER, ticker.last);
     const qty = currencyToCoin(price, ticker.last);
     const limitPrice = price;
+    const percenChanged = currencyPriceChange(___, ticker.last)
     const BUY_WHEN_PERCEN_LOWER_THAN = parseFloat(process.env.BUY_WHEN_PERCEN_LOWER_THAN);
     
-    if (!(ticker.last < BUY_WHEN_PERCEN_LOWER_THAN))
+    if (!(BUY_WHEN_PERCEN_LOWER_THAN < percenChanged))
         return console.warn(`Valorização atual de ${ticker.last}, ainda muito alto para realizar compra.`);
     
     if (!isBalanceEnough(accountBalance.brl, BUY_WHEN_BALANCE_HIGHER_THAN))
