@@ -6,10 +6,6 @@ const genSignature = (secret, queryString) => (
         .digest('hex')
 );
 
-const ObjectFromEntries = (entries) => (
-    entries.reduce((acc, [key, val]) => ({ ...acc, [key]: val }), {})
-);
-
 const parseBalanceToFloat = (balance, fixed=5) =>
     parseFloat(parseFloat(balance).toFixed(fixed));
 
@@ -28,8 +24,6 @@ const currencyPriceChange = (price24h, currencyPrice) => (
 module.exports = {
     genSignature,
     isBalanceEnough,
-    ObjectFromEntries,
-    compose,
     parseBalanceToFloat,
     nowMinus,
     percentToCurrency,

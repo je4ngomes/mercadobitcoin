@@ -1,4 +1,5 @@
 const axios = require('axios').default;
+const chalk = require('chalk').default;
 const qs = require('querystring');
 const R = require('ramda');
 
@@ -6,7 +7,9 @@ const {
     genSignature, 
     nowMinus,
     isBalanceEnough,
-    ObjectFromEntries,
+    currencyPriceChange,
+    currencyToCoin,
+    percentToCurrency,
     parseBalanceToFloat
 } = require('./utils/utils');
 
@@ -86,42 +89,60 @@ const getBalance = () => (
 );
 
 const handleBuyOrder = (ticker, accountBalance) => {
+    const {
+        BUY_PER,
+        DAILY_PRICE,
+        BUY_WHEN_PERCEN_LOWER_THAN
+    } = process.env
     const 
-        price = percentToCurrency(process.env.BUY_PER, ticker.last),
-        limitPrice = price;
-    const qty = currencyToCoin(price, ticker.last);
-    const percenChanges = currencyPriceChange(___, ticker.last)
-    const BUY_WHEN_PERCEN_LOWER_THAN = parseFloat(process.env.BUY_WHEN_PERCEN_LOWER_THAN);
-    
-    if (!(BUY_WHEN_PERCEN_LOWER_THAN < percenChanges))
-        return console.warn(`Valorização atual de ${ticker.last}, ainda muito alto para realizar compra.`);
-    
-    if (!isBalanceEnough(accountBalance.brl, BUY_WHEN_BALANCE_HIGHER_THAN))
-        return console.warn('Saldo insuficiente para realizar compra.');
+        price = percentToCurrency(parseFloat(BUY_PER), ticker.last),
+        limitPrice = ticker.sell;
 
-    placeBuyOrder(qty, limitPrice)
-        .then(buyOrder => console.info('Ordem de compra inserida ao livro ', buyOrder))
-        .catch(e => console.error('Nao foi possivel realizar a compra devido algum erro.'));
+    const qty = currencyToCoin(price, ticker.last);
+    const percenChanges = currencyPriceChange(parseFloat(DAILY_PRICE), ticker.last)
+    const BUY_WHEN_LOWER = parseFloat(BUY_WHEN_PERCEN_LOWER_THAN);
+
+    console.log(chalk.yellow('Quantidade Compra: ', qty));
+    console.log(chalk.yellow('Compra Limite: R$', limitPrice));
+
+    if (!(percenChanges <= BUY_WHEN_LOWER))
+        return console.warn(chalk.red(`Compra não realizada, moeda nao está abaixo de ${BUY_WHEN_LOWER}%.`));
+    
+    if (!isBalanceEnough(accountBalance.brl, 50))
+        return console.warn(chalk.red('Saldo insuficiente para realizar compra.'));
+
+    // placeBuyOrder(qty, limitPrice)
+    //     .then(buyOrder => console.info(chalk.green('Ordem de compra inserida ao livro.')))
+    //     .catch(e => console.error(chalk.red('Nao foi possivel realizar a compra devido algum erro.')));
 };
 
 const handleSellOrder = (ticker, accountBalance) => {
+    const {
+        SELL_PER,
+        PROFITABILITY,
+        DAILY_PRICE,
+        SELL_WHEN_PERCEN_HIGHER_THAN
+    } = process.env;
     const 
-        price = percentToCurrency(process.env.SEll_PER, ticker.last),
-        limitPrice = price;
-    const qty = process.env.SELL_QTY;
-    const limitPrice = ticker.sell;
-    const PROFITABILITY = parseFloat(process.env.PROFITABILITY);
-    const SELL_WHEN_PRICE_HIGHER_THAN = parseFloat(process.env.SELL_WHEN_PRICE_HIGHER_THAN);
+        price = percentToCurrency(parseFloat(SELL_PER), ticker.last),
+        limitPrice = ticker.sell * parseFloat(PROFITABILITY);
+    const percenChanges = currencyPriceChange(parseFloat(DAILY_PRICE), ticker.last)
+    const qty = currencyToCoin(price, ticker.last);
+    const SELL_WHEN_HIGHER = parseFloat(SELL_WHEN_PERCEN_HIGHER_THAN);
 
-    if (!(SELL_WHEN_PRICE_HIGHER_THAN > ticker.sell))
-        return console.warn(`Valorizacao de ${ticker.sell} não atende  o valor de ${SELL_WHEN_PRICE_HIGHER_THAN} para realizar venda.`)
+    console.log(chalk.yellow('Quantidade Venda: ', qty));
+    console.log(chalk.yellow('Venda Limite: R$', limitPrice));
+    console.log(chalk.yellow('Valorização %: ', percenChanges, '%'));
+
+    if (!(percenChanges >= SELL_WHEN_HIGHER))
+        return console.warn(chalk.red(`Venda não realizada, moeda nao está acima de ${SELL_WHEN_HIGHER}%.`))
 
     if (!isBalanceEnough(accountBalance.btc, qty))
-        return console.warn('Saldo insuficiente para realizar venda.');
+        return console.warn(chalk.red('Saldo insuficiente para realizar venda.'));
 
-    placeBuyOrder(qty, limitPrice * PROFITABILITY)
-        .then(sellOrder => console.info('Ordem de venda inserida ao livro ', sellOrder))
-        .catch(e => console.error('Nao foi possivel realizar a venda devido algum erro.'))
+    // placeSellOrder(qty, limitPrice)
+    //     .then(sellOrder => console.info(chalk.green('Ordem de venda inserida ao livro.')))
+    //     .catch(e => console.error(chalk.red('Nao foi possivel realizar a venda devido algum erro.')))
 };
 
 module.exports = {

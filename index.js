@@ -1,7 +1,7 @@
 const path = require('path');
-require('./config/env').config(path.join(__dirname, '.', 'config/.env'))
+const R = require('ramda');
+require('./config/env').config(path.join(__dirname, '.', 'config/.env'));
 
-const { ObjectFromEntries } = require('./utils/utils');
 const { 
     getTicker,
     getBalance,
@@ -16,14 +16,21 @@ const monitor = () => {
             console.log(`Saldo disponivel de R$: ${balance.brl}`);
             console.log('Valorizacao Atual:');
             console.table(
-                ObjectFromEntries(
-                    Object.entries(ticker).map(([k, v]) => [k, parseFloat(v).toFixed(2)])
-                )
+                R.compose(
+                    R.fromPairs,
+                    R.map(([k, v]) => [k, parseFloat(v).toFixed(2)]),
+                    R.toPairs
+                )(ticker)
             );
 
+            const objValuesToFloat = R.compose(
+                R.fromPairs,
+                R.map(([k, v]) => [k, parseFloat(v)]),
+                R.toPairs
+            )(ticker);
             // operation handlers
-            handleBuyOrder(ticker, balance);
-            handleSellOrder(ticker, balance);
+            handleBuyOrder(objValuesToFloat, balance);
+            handleSellOrder(objValuesToFloat, balance);
 
         })
         .catch(e => console.error(e))
