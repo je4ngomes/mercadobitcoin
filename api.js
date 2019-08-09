@@ -1,5 +1,6 @@
 const axios = require('axios').default;
 const chalk = require('chalk').default;
+const mongoose = require('mongoose');
 const qs = require('querystring');
 const R = require('ramda');
 
@@ -13,14 +14,14 @@ const {
     parseBalanceToFloat
 } = require('./utils/utils');
 
-
+const Order = mongoose.model('order');
 const mBConfig = {
-    CURRENCY: process.env.CURRENCY,
-    KEY: process.env.KEY,
-    SECRET: process.env.SECRET,
-    PIN: process.env.PIN,
-    ENDPOINT_INFO_API: process.env.ENDPOINT_INFO_API,
-    ENDPOINT_TRADE_API: process.env.ENDPOINT_TRADE_API
+    CURRENCY: null,
+    KEY: null,
+    SECRET: null,
+    PIN: null,
+    ENDPOINT_INFO_API: 'https://www.mercadobitcoin.com.br/api',
+    ENDPOINT_TRADE_API: 'https://www.mercadobitcoin.net/tapi/v3/'
 };
 
 const infoApiCall = method => (
@@ -88,71 +89,93 @@ const getBalance = () => (
         )
 );
 
-const handleBuyOrder = (ticker, accountBalance) => {
-    const {
-        BUY_PER,
-        DAILY_PRICE,
-        BUY_WHEN_PERCEN_LOWER_THAN
-    } = process.env
+const setBuyOrder = ({ BUY_PER, BUY_WHEN_PER_LOWER }) =>
+    (ticker, accountBalance, last6hPrice) => {
     const 
-        price = percentToCurrency(parseFloat(BUY_PER), ticker.last),
+        price = percentToCurrency(BUY_PER, ticker.last),
         limitPrice = ticker.sell;
-
     const qty = currencyToCoin(price, ticker.last);
-    const percenChanges = currencyPriceChange(parseFloat(DAILY_PRICE), ticker.last)
-    const BUY_WHEN_LOWER = parseFloat(BUY_WHEN_PERCEN_LOWER_THAN);
+    const percenChanges = currencyPriceChange(last6hPrice, ticker.last)
 
     console.log(chalk.yellow('Quantidade Compra: ', qty));
     console.log(chalk.yellow('Compra Limite: R$', limitPrice));
 
-    if (!(percenChanges <= BUY_WHEN_LOWER))
-        return console.warn(chalk.red(`Compra não realizada, moeda nao está abaixo de ${BUY_WHEN_LOWER}%.`));
+    if (!(percenChanges <= BUY_WHEN_PER_LOWER))
+        return console.warn(chalk.red(`Compra não realizada, moeda nao está abaixo de ${BUY_WHEN_PER_LOWER}%.`));
     
     if (!isBalanceEnough(accountBalance.brl, 50))
         return console.warn(chalk.red('Saldo insuficiente para realizar compra.'));
 
-    // placeBuyOrder(qty, limitPrice)
-    //     .then(buyOrder => console.info(chalk.green('Ordem de compra inserida ao livro.')))
-    //     .catch(e => console.error(chalk.red('Nao foi possivel realizar a compra devido algum erro.')));
+    placeBuyOrder(qty, limitPrice)
+        .then(buyOrder => {
+            console.info(chalk.green('Ordem de compra inserida ao livro.'));
+
+            new Order({ 
+                order_id: buyOrder.order.order_id,
+                qty: buyOrder.order.quantity,
+                limitPrice: buyOrder.order.limit_price
+             })
+        })
+        .catch(e => console.error(chalk.red('Nao foi possivel realizar a compra devido algum erro.')));
 };
 
-const handleSellOrder = (ticker, accountBalance) => {
-    const {
-        SELL_PER,
-        PROFITABILITY,
-        DAILY_PRICE,
-        SELL_WHEN_PERCEN_HIGHER_THAN
-    } = process.env;
-    const 
-        price = percentToCurrency(parseFloat(SELL_PER), ticker.last),
-        limitPrice = ticker.sell * parseFloat(PROFITABILITY);
-    const percenChanges = currencyPriceChange(parseFloat(DAILY_PRICE), ticker.last)
-    const qty = currencyToCoin(price, ticker.last);
-    const SELL_WHEN_HIGHER = parseFloat(SELL_WHEN_PERCEN_HIGHER_THAN);
+const setSellOrder = ({ PROFIT, SELL_WHEN_PER_HIGHER }) =>
+    (ticker, accountBalance, last6hPrice) => {
+    const percenChanges = currencyPriceChange(last6hPrice, ticker.last);
 
-    console.log(chalk.yellow('Quantidade Venda: ', qty));
-    console.log(chalk.yellow('Venda Limite: R$', limitPrice));
-    console.log(chalk.yellow('Valorização %: ', percenChanges, '%'));
+    if (!(percenChanges >= SELL_WHEN_PER_HIGHER))
+        return console.warn(chalk.red(`Venda não realizada, moeda nao está acima de ${SELL_WHEN_PER_HIGHER}%.`))
 
-    if (!(percenChanges >= SELL_WHEN_HIGHER))
-        return console.warn(chalk.red(`Venda não realizada, moeda nao está acima de ${SELL_WHEN_HIGHER}%.`))
 
-    if (!isBalanceEnough(accountBalance.btc, qty))
-        return console.warn(chalk.red('Saldo insuficiente para realizar venda.'));
+    Order.findOne({ dispatched: false, type: 'BUY' })
+        .sort({ qty: 1 })
+        .then(doc => {
+            const profitIncluded = doc.limitPrice * PROFIT;
+            const limit = (
+                profitIncluded > ticker.sell
+                    ? profitIncluded 
+                    : ticker.sell
+            );
 
-    // placeSellOrder(qty, limitPrice)
-    //     .then(sellOrder => console.info(chalk.green('Ordem de venda inserida ao livro.')))
-    //     .catch(e => console.error(chalk.red('Nao foi possivel realizar a venda devido algum erro.')))
+            console.log(chalk.yellow('Quantidade Venda: ', doc.qty));
+            console.log(chalk.yellow('Venda Limite: R$', limit));
+            console.log(chalk.yellow(`Valorização %: ${percenChanges}%`));
+
+            if (!isBalanceEnough(accountBalance.btc, doc.qty))
+                return console.warn(chalk.red('Saldo insuficiente para realizar venda.'));
+        
+            placeSellOrder(doc.qty, limit)
+                .then(sellOrder => {
+                    console.info(chalk.green('Ordem de venda inserida ao livro.'));
+                    
+                    // delete buy order
+                    Order.deleteOne({ _id: doc.id });
+                })
+                .catch(e => console.error(chalk.red('Nao foi possivel realizar a venda devido algum erro.')))
+        })
+        .catch(e => console.error('Erro no banco de dados.'));
 };
 
-module.exports = {
-    getTicker,
-    getOrderBook,
-    getTrades,
-    getAccountInfo,
-    getBalance,
-    listMyOrders,
-    handleBuyOrder,
-    handleSellOrder,
-    cancelOrder
-};
+module.exports = ({
+    BUY_WHEN_PER_LOWER,
+    BUY_PER,
+    SELL_WHEN_PER_HIGHER,
+    PROFIT=1.029,
+    CURRENCY='BTC'
+}) => {
+    // set exchange global config
+    mBConfig.CURRENCY = CURRENCY;
+
+
+    return {
+        getTicker,
+        getOrderBook,
+        getTrades,
+        getAccountInfo,
+        getBalance,
+        listMyOrders,
+        handleBuyOrder: setBuyOrder({ BUY_PER, BUY_WHEN_PER_LOWER }),
+        handleSellOrder: setSellOrder({ PROFIT, SELL_WHEN_PER_HIGHER }),
+        cancelOrder
+    };
+}

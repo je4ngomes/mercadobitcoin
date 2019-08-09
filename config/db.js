@@ -1,3 +1,3 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
-mongoose.connect('mongodb://127.0.0.1/receipt', { useNewUrlParser: true });
+mongoose.connect('mongodb://127.0.0.1/tradingBot', { useNewUrlParser: true });

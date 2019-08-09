@@ -15,6 +15,14 @@ const isBalanceEnough = (currentBalance, amount) => (
 
 const nowMinus = (minus) => Math.round(new Date().getTime() / minus);
 
+const getLast6hPrice = (envPrice, { last }) => envPrice === 0 ? last : envPrice;
+const validArgsAsRequired = (args, list) => (
+    args.forEach(arg => {
+        if (!list.includes(arg))
+            throw `Argument ${arg} is required, check --help.`;
+    })
+);
+
 const percentToCurrency = (per, currencyPrice) => (per * currencyPrice) / 100;
 const currencyToCoin = (currency, currencyPrice) => currency / currencyPrice;
 const currencyPriceChange = (price24h, currencyPrice) => (
@@ -26,7 +34,9 @@ module.exports = {
     isBalanceEnough,
     parseBalanceToFloat,
     nowMinus,
+    getLast6hPrice,
     percentToCurrency,
     currencyToCoin,
+    validArgsAsRequired,
     currencyPriceChange
 };
