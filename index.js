@@ -1,7 +1,8 @@
 const path = require('path');
+const chalk = require('chalk').default;
+const R = require('ramda');
 require('./config/env').config(path.join(__dirname, '.', 'config/.env'))
 
-const { ObjectFromEntries } = require('./utils/utils');
 const { 
     getTicker,
     getBalance,
@@ -13,12 +14,14 @@ const {
 const monitor = () => {
     Promise.all([getBalance(), getTicker()]) 
         .then(([balance, { ticker }]) => {
-            console.log(`Saldo disponivel de R$: ${balance.brl}`);
+            console.log(chalk.blue(`Saldo disponivel de R$: ${balance.brl}`));
             console.log('Valorizacao Atual:');
             console.table(
-                ObjectFromEntries(
-                    Object.entries(ticker).map(([k, v]) => [k, parseFloat(v).toFixed(2)])
-                )
+                R.compose(
+                    R.fromPairs,
+                    R.map(([k, v]) => [k, parseFloat(v).toFixed(2)]),
+                    R.toPairs
+                )(ticker)
             );
 
             // operation handlers
