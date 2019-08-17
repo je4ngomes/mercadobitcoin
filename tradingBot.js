@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const path = require('path');
+const mongoose = require('mongoose');
 const schedule = require('node-schedule');
 const R = require('ramda');
 const program = require('commander')
@@ -15,7 +16,7 @@ require('./config/env').config(path.join(__dirname, '.', 'config/.env'));
 require('./config/db');
 require('./models/Order');
 
-const { getLast6hPrice, validArgsAsRequired } = require('./utils/utils');
+const { getLastPrice, validArgsAsRequired } = require('./utils/utils');
 const apiConfig = require("./api");
 
 const args = ['BUY_WHEN_PER_LOWER', 'BUY_PER', 
@@ -32,6 +33,7 @@ const {
         R.pick(args)
     )(program)
 );
+const Order = mongoose.model('order');
 
 const monitor = () => {
     Promise.all([getBalance(), getTicker()]) 
@@ -52,12 +54,12 @@ const monitor = () => {
                 R.map(([k, v]) => [k, parseFloat(v)]),
                 R.toPairs
             )(ticker);
-            const last6hPrice = getLast6hPrice(parseFloat(process.env.last6hPrice), tickerFloat);
 
-            console.log(last6hPrice)
-            // operation handlers
-            // handleBuyOrder(tickerFloat, balance, last6hPrice);
-            // handleSellOrder(tickerFloat, balance, last6hPrice);
+            const lastPrice = getLastPrice(parseFloat(process.env.lastPrice), tickerFloat);
+
+
+            handleBuyOrder(tickerFloat, balance, lastPrice);
+            handleSellOrder(tickerFloat, balance, lastPrice);
 
         })
         .catch(e => console.error(e))
@@ -67,8 +69,8 @@ const monitor = () => {
 console.log('Robo em modo de monitoramento');
 setInterval(monitor, 8000);
 
-schedule.scheduleJob('0 */6 * * *', async () => {
+schedule.scheduleJob('0 */3 * * *', async () => {
     const { ticker: { last } } = await getTicker();
 
-    process.env.last6hPrice = last;
+    process.env.lastPrice = last;
 });

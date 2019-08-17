@@ -73,14 +73,14 @@ const listMyOrders = params => (
 const placeBuyOrder = (qty, limit_price) => (
     tradeApiCall('place_buy_order', {
         coin_pair: mBConfig.getCoin(),
-        quantity: `${qty.substring(0, 10)}`,
+        quantity: `${(''+qty).substring(0, 10)}`,
         limit_price: ''+limit_price
     })
 );
 const placeSellOrder = (qty, limit_price) => (
     tradeApiCall('place_sell_order', {
         coin_pair: mBConfig.getCoin(),
-        quantity: `${qty.substring(0, 10)}`,
+        quantity: `${(''+qty).substring(0, 10)}`,
         limit_price: ''+limit_price
     })
 );
@@ -106,14 +106,18 @@ const setBuyOrder = ({ BUY_PER, BUY_WHEN_PER_LOWER }) =>
     (ticker, accountBalance, last6hPrice) => {
     const 
         price = percentToCurrency(BUY_PER, ticker.last),
-        priceWithExchanTaxes = price + percentToCurrency(0.70, price)
+        priceWithExchanTaxes = (
+            price >= 50 
+                ? price + percentToCurrency(0.70, price) 
+                : 50 + percentToCurrency(0.70, 50)
+        ),
         limitPrice = ticker.sell;
     const qty = currencyToCoin(priceWithExchanTaxes, ticker.last);
     const percenChanges = currencyPriceChange(last6hPrice, ticker.last)
 
     console.log(chalk.yellow('Quantidade Compra: ', qty));
     console.log(chalk.yellow('Compra Limite: R$', limitPrice));
-
+    
     if (!(percenChanges <= BUY_WHEN_PER_LOWER))
         return console.warn(chalk.red(`Compra não realizada, moeda nao está abaixo de ${BUY_WHEN_PER_LOWER}%.`));
     
@@ -131,20 +135,29 @@ const setBuyOrder = ({ BUY_PER, BUY_WHEN_PER_LOWER }) =>
                 type: 'BUY'
              }).save();
         })
-        .catch(e => console.error(chalk.red('Nao foi possivel realizar a compra devido algum erro.')));
+        .catch(e => console.error(chalk.red('Nao foi possivel realizar a compra devido algum erro.'), e));
 };
 
 const setSellOrder = ({ PROFIT, SELL_WHEN_PER_HIGHER }) =>
     (ticker, accountBalance, last6hPrice) => {
     const percenChanges = currencyPriceChange(last6hPrice, ticker.last);
 
-    if (!(percenChanges >= SELL_WHEN_PER_HIGHER))
-        return console.warn(chalk.red(`Venda não realizada, moeda nao está acima de ${SELL_WHEN_PER_HIGHER}%.`))
-
-
     Order.findOne({ dispatched: false, type: 'BUY' })
         .sort({ limitPrice: 1 })
         .then(doc => {
+            
+            if (!doc)
+                if (!(percenChanges >= SELL_WHEN_PER_HIGHER))
+                    return console.warn(chalk.red(`Venda não realizada, moeda nao está acima de ${SELL_WHEN_PER_HIGHER}%.`));
+            else
+                if (doc.limitePrice < ticker.sell)
+                    return console.warn(chalk.red(`Venda não realizada, vamos tenta na proxima.`));
+
+
+            if (!isBalanceEnough(accountBalance.btc, doc.qty))
+                return console.warn(chalk.red('Saldo insuficiente para realizar venda.'));
+
+
             const profitIncluded = doc.limitPrice * PROFIT;
             const limit = (
                 profitIncluded > ticker.sell
@@ -155,9 +168,6 @@ const setSellOrder = ({ PROFIT, SELL_WHEN_PER_HIGHER }) =>
             console.log(chalk.yellow('Quantidade Venda: ', doc.qty));
             console.log(chalk.yellow('Venda Limite: R$', limit));
             console.log(chalk.yellow(`Valorização %: ${percenChanges}%`));
-
-            if (!isBalanceEnough(accountBalance.btc, doc.qty))
-                return console.warn(chalk.red('Saldo insuficiente para realizar venda.'));
         
             placeSellOrder(doc.qty, limit)
                 .then(sellOrder => {
@@ -168,7 +178,7 @@ const setSellOrder = ({ PROFIT, SELL_WHEN_PER_HIGHER }) =>
                 })
                 .catch(e => console.error(chalk.red('Nao foi possivel realizar a venda devido algum erro.')))
         })
-        .catch(e => console.error('Erro no banco de dados.'));
+        .catch(e => console.error('Erro no banco de dados.', e));
 };
 
 module.exports = ({
@@ -180,7 +190,6 @@ module.exports = ({
 }) => {
     // set exchange global config
     mBConfig.CURRENCY = CURRENCY;
-
 
     return {
         getTicker,
