@@ -38,7 +38,7 @@ const Order = mongoose.model('order');
 const monitor = () => {
     Promise.all([getBalance(), getTicker()]) 
         .then(([balance, { ticker }]) => {
-            console.log(`Saldo disponivel de R$: ${balance.brl}`);
+            console.log(`Saldo disponivel: [R$: ${balance.brl}] [BTC: ${balance.btc}]`);
             console.log('Valorizacao Atual:');
             console.table(
                 R.compose(
@@ -59,11 +59,10 @@ const monitor = () => {
 
 
             handleBuyOrder(tickerFloat, balance, lastPrice);
-            handleSellOrder(tickerFloat, balance, lastPrice);
+            handleSellOrder(tickerFloat, balance);
 
         })
-        .catch(e => console.error(e))
-        .finally(_ => console.log('=================================='));
+        .catch(e => console.error(e));
 };
 
 console.log('Robo em modo de monitoramento');

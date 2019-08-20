@@ -10,6 +10,7 @@ const {
     isBalanceEnough,
     currencyPriceChange,
     currencyToCoin,
+    coinToCurrency,
     percentToCurrency,
     parseBalanceToFloat
 } = require('./utils/utils');
@@ -81,7 +82,7 @@ const placeSellOrder = (qty, limit_price) => (
     tradeApiCall('place_sell_order', {
         coin_pair: mBConfig.getCoin(),
         quantity: `${(''+qty).substring(0, 10)}`,
-        limit_price: ''+limit_price
+        limit_price: `${(''+limit_price).substring(0, 5)}`
     })
 );
 const cancelOrder = (order_id) => (
@@ -103,7 +104,7 @@ const getBalance = () => (
 );
 
 const setBuyOrder = ({ BUY_PER, BUY_WHEN_PER_LOWER }) =>
-    (ticker, accountBalance, last6hPrice) => {
+    (ticker, accountBalance, lastPrice) => {
     const 
         price = percentToCurrency(BUY_PER, ticker.last),
         priceWithExchanTaxes = (
@@ -113,7 +114,7 @@ const setBuyOrder = ({ BUY_PER, BUY_WHEN_PER_LOWER }) =>
         ),
         limitPrice = ticker.sell;
     const qty = currencyToCoin(priceWithExchanTaxes, ticker.last);
-    const percenChanges = currencyPriceChange(last6hPrice, ticker.last)
+    const percenChanges = currencyPriceChange(lastPrice, ticker.last)
 
     console.log(chalk.yellow('Quantidade Compra: ', qty));
     console.log(chalk.yellow('Compra Limite: R$', limitPrice));
@@ -126,11 +127,11 @@ const setBuyOrder = ({ BUY_PER, BUY_WHEN_PER_LOWER }) =>
 
     placeBuyOrder(qty, limitPrice)
         .then(buyOrder => {
-            console.info(chalk.green('Ordem de compra inserida ao livro.'));
+            console.info(chalk.green('Ordem de compra inserida ao livro. ', buyOrder));
 
             new Order({ 
                 order_id: buyOrder.order.order_id,
-                qty: buyOrder.order.quantity,
+                qty: currencyToCoin(price, ticker.last),
                 limitPrice: buyOrder.order.limit_price,
                 type: 'BUY'
              }).save();
@@ -139,20 +140,18 @@ const setBuyOrder = ({ BUY_PER, BUY_WHEN_PER_LOWER }) =>
 };
 
 const setSellOrder = ({ PROFIT, SELL_WHEN_PER_HIGHER }) =>
-    (ticker, accountBalance, last6hPrice) => {
-    const percenChanges = currencyPriceChange(last6hPrice, ticker.last);
+    (ticker, accountBalance) => {
 
-    Order.findOne({ dispatched: false, type: 'BUY' })
+    Order.findOne({ type: 'BUY', limitPrice: { $lt: ticker.sell } })
         .sort({ limitPrice: 1 })
-        .then(doc => {
-            
+        .then(doc => {            
             if (!doc)
-                if (!(percenChanges >= SELL_WHEN_PER_HIGHER))
-                    return console.warn(chalk.red(`Venda não realizada, moeda nao está acima de ${SELL_WHEN_PER_HIGHER}%.`));
-            else
-                if (doc.limitePrice < ticker.sell)
-                    return console.warn(chalk.red(`Venda não realizada, vamos tenta na proxima.`));
+                return console.warn(chalk.red(`Não a compras anteriores no banco de dados para realizar venda.`));
 
+            const percenChanges = currencyPriceChange(doc.limitPrice, ticker.last);            
+
+            if (!(percenChanges >= SELL_WHEN_PER_HIGHER))
+                return console.warn(chalk.red(`Venda não realizada, moeda nao está acima de ${SELL_WHEN_PER_HIGHER}%.`));
 
             if (!isBalanceEnough(accountBalance.btc, doc.qty))
                 return console.warn(chalk.red('Saldo insuficiente para realizar venda.'));
@@ -170,11 +169,11 @@ const setSellOrder = ({ PROFIT, SELL_WHEN_PER_HIGHER }) =>
             console.log(chalk.yellow(`Valorização %: ${percenChanges}%`));
         
             placeSellOrder(doc.qty, limit)
-                .then(sellOrder => {
-                    console.info(chalk.green('Ordem de venda inserida ao livro.'));
+                .then(async sellOrder => {
+                    console.info(chalk.green('Ordem de venda inserida ao livro. '), sellOrder);
                     
                     // delete buy order
-                    Order.deleteOne({ _id: doc.id });
+                    await Order.findOne({ _id: doc.id });
                 })
                 .catch(e => console.error(chalk.red('Nao foi possivel realizar a venda devido algum erro.')))
         })
@@ -196,6 +195,7 @@ module.exports = ({
         getOrderBook,
         getTrades,
         getAccountInfo,
+        placeSellOrder,
         getBalance,
         listMyOrders,
         handleBuyOrder: setBuyOrder({ BUY_PER, BUY_WHEN_PER_LOWER }),
