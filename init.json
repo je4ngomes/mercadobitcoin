@@ -5,5 +5,5 @@
     "script": "tradingBot.js",
     "sourceDir": "/home/root/mercadobitcoin (copy 1)",
     "logFile": "/home/root/mercadobitcoin (copy 1)/logs/forever.log",
-	"args": ["--BUY_WHEN_PER_LOWER", -0.90, "--BUY_PER", 0.13, "--SELL_WHEN_PER_HIGHER", 1.2, "--PROFIT", 1.009, "--CURRENCY", "BTC"]
+	"args": ["--BUY_PER", 0.5, "--BUY_QTY_PER", 0.13, "--SELL_PER", 1.009, "--CURRENCY", "BTC"]
 }
