@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const moment = require('moment');
 
-const Order = mongoose.model('order');
+// const Order = mongoose.model('order');
 
 const genSignature = (secret, queryString) => (
     crypto.createHmac('sha512', secret)
@@ -20,6 +20,7 @@ const isBalanceEnough = (currentBalance, amount) => (
 const nowMinus = (seconds) => moment(new Date().getTime()).subtract(seconds, 'seconds').valueOf();
 
 const getLastPrice = (envPrice, { last }) => envPrice === 0 ? last : envPrice;
+
 const validArgsAsRequired = (args, obj) => {
     args.forEach(arg => {
         if (!Object.keys(obj).includes(arg))
@@ -36,14 +37,18 @@ const priceWithExchangeTaxes = (price, taxes) => (
 );
 
 const percentToCurrency = (per, currencyPrice) => (per * currencyPrice) / 100;
+
 const currencyToCoin = (currency, currencyPrice) => currency / currencyPrice;
+
 const percentToCoin = (per, currencyPrice) => (
     currencyToCoin(
         percentToCurrency(per, currencyPrice),
         currencyPrice
     )
 );
+
 const coinToCurrency = (coin, currencyPrice) => coin * currencyPrice;
+
 const currencyPriceChange = (last, currencyPrice) => (
     ((currencyPrice - last) / last) * 100
 );
@@ -51,6 +56,8 @@ const currencyPriceChange = (last, currencyPrice) => (
 const getProfit = (limitePriceBuy, limitePriceSell, qty) => (
     coinToCurrency(qty, limitePriceSell) - coinToCurrency(qty, limitePriceBuy)
 );
+
+const perBetween = (initValue, postValue) => ((postValue - initValue) / initValue) * 100;
 
 const saveOrder = ({ order }, orderType, currency) => (
     new Order({
@@ -61,6 +68,7 @@ const saveOrder = ({ order }, orderType, currency) => (
         currency
     }).save()
 );
+
 
 module.exports = {
     genSignature,
@@ -76,6 +84,7 @@ module.exports = {
     percentToCurrency,
     currencyToCoin,
     coinToCurrency,
+    perBetween,
     validArgsAsRequired,
     currencyPriceChange
 };

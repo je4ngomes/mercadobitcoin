@@ -33,13 +33,19 @@ const setBuyOrder = (BUY_QTY_PER, BUY_PER) =>
     console.log(chalk.yellow('Quantidade Compra: ', qty));
     console.log(chalk.yellow('Compra Limite: R$', limitPrice));
 
-    placeBuyOrder(qty, limitPrice)
-        .then(buyOrder => {
-            console.info(chalk.green('Ordem de compra inserida ao livro. ', buyOrder));
+    for (let i=0; i < parseInt((accountBalance.brl / price)); i++) {
+        if (i >= 20) return;
 
-            saveOrder(buyOrder, 'BUY', mBConfig.getCoin());      
-        })
-        .catch(e => console.error(chalk.red('Nao foi possivel realizar a compra devido algum erro.'), e));
+        const timeNonce = 10 * (i + 1);
+
+        placeBuyOrder(qty, limitPrice, timeNonce)
+            .then(buyOrder => {
+                console.info(chalk.green('Ordem de compra inserida ao livro. '), buyOrder);
+
+                saveOrder(buyOrder, 'BUY', mBConfig.getCoin());      
+            })
+            .catch(e => console.error(chalk.red('Nao foi possivel realizar a compra devido algum erro.'), e));
+    }
 };
 
 const setSellOrder = (SELL_PER, BUY_QTY_PER) => async (ticker, accountBalance) => {
@@ -50,21 +56,27 @@ const setSellOrder = (SELL_PER, BUY_QTY_PER) => async (ticker, accountBalance) =
     });
 
     if (orders.length === 0) {
-        if (!isBalanceEnough(accountBalance.btc, percentToCoin(SELL_PER, ticker.sell)))
+        if (!isBalanceEnough(accountBalance.btc, percentToCoin(BUY_QTY_PER, ticker.sell))
+                || !isBalanceEnough(accountBalance.btc, currencyToCoin(50, ticker.sell)))
             return console.warn(chalk.red('Saldo insuficiente para realizar venda.'));
 
+        const qty = isBalanceEnough(
+                accountBalance.btc, 
+                percentToCoin(BUY_QTY_PER, ticker.sell)
+            ) ? percentToCoin(BUY_QTY_PER, ticker.sell) : accountBalance.btc;
+
         placeSellOrder(
-            percentToCurrency(BUY_QTY_PER, ticker.sell),
-            ticker.sell
+            qty,
+            ticker.sell * SELL_PER
         ).then(sellOrder => {
             if (!sellOrder) return;
 
             saveOrder(sellOrder, 'SELL', mBConfig.getCoin());
-        });
+        }).catch(e => console.error(e));
     }       
 
     // place each order if balance is enough
-    orders.forEach(order => {
+    orders.forEach((order, i) => {
         if (!isBalanceEnough(accountBalance.btc, order.qty))
             return console.warn(chalk.red('Saldo insuficiente para realizar venda.'));
                 
@@ -79,27 +91,16 @@ const setSellOrder = (SELL_PER, BUY_QTY_PER) => async (ticker, accountBalance) =
         console.log(chalk.yellow('Venda Limite: R$', limit));
         console.log(chalk.green('Rentabilidade de: '), getProfit(order.limit_price, limit, order.qty))                
     
-        placeSellOrder(order.qty, limit)
+        placeSellOrder(order.qty, limit, 10 * (i + 1))
             .then(sellOrder => {
                 console.info(chalk.green('Ordem de venda inserida ao livro. '), sellOrder);
                 
-                saveOrder(sellOrder, 'BUY', mBConfig.getCoin());
+                saveOrder(sellOrder, 'SELL', mBConfig.getCoin());
             })
             .then(_ => Order.updateOne({ _id: order._id }, { dispatched: true }))
             .catch(e => console.error(chalk.red('Nao foi possivel realizar a venda devido algum erro.')))
     });
 };
-
-const setCanceledOrders = BUY_PER => ticker => (
-    // Update canceled order so that it can be reorder eventually
-    Order.updateMany(
-        { orderType: 'SELL', dispatched: true }, { 
-            dispatched: false, 
-            orderType: 'BUY', 
-            limit_price: setBuyLimitPrice(ticker, BUY_PER) 
-        }
-    )
-);
 
 module.exports = ({
     BUY_PER,
@@ -107,6 +108,5 @@ module.exports = ({
     BUY_QTY_PER
 }) => ({
     handleBuyOrder: setBuyOrder(BUY_QTY_PER, BUY_PER),
-    handleSellOrder: setSellOrder(SELL_PER, BUY_QTY_PER),
-    handleCanceledOrders: setCanceledOrders(BUY_PER)
+    handleSellOrder: setSellOrder(SELL_PER, BUY_QTY_PER)
 });

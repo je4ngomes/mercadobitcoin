@@ -17,10 +17,10 @@ const infoApiCall = (method) => (
         .then(retrieveData)
 );
 
-const tradeApiCall = async (method, params={}) => {
+const tradeApiCall = async (method, params={}, nonce=10) => {
     const queryString = qs.stringify({
         tapi_method: method,
-        tapi_nonce: nowMinus(10),
+        tapi_nonce: nowMinus(nonce),
         ...params
     });
     const headers = {
@@ -57,27 +57,27 @@ const listMyOrders = params => (
     })
 );
 
-const placeBuyOrder = (qty, limit_price) => (
+const placeBuyOrder = (qty, limit_price, nonce=10) => (
     tradeApiCall('place_buy_order', {
         coin_pair: mBConfig.getCoin(),
         quantity: `${(''+qty).substring(0, 10)}`,
-        limit_price: ''+limit_price
-    })
+        limit_price: `${(''+limit_price).substring(0, 5)}`
+    }, nonce)
 );
 
-const placeSellOrder = (qty, limit_price) => (
+const placeSellOrder = (qty, limit_price, nonce=10) => (
     tradeApiCall('place_sell_order', {
         coin_pair: mBConfig.getCoin(),
         quantity: `${(''+qty).substring(0, 10)}`,
         limit_price: `${(''+limit_price).substring(0, 5)}`
-    })
+    }, nonce)
 );
 
-const cancelOrder = (order_id) => (
+const cancelOrder = (order_id, nonce=10) => (
     tradeApiCall('cancel_order', {
         coin_pair: mBConfig.getCoin(),
         order_id
-    })
+    }, nonce)
 );
 
 const getBalance = () => (
